@@ -1,0 +1,129 @@
+'''
+The database comes in 3 different configurations: "basic", "complete", and "complete_normalized"
+
+Basic contains only the most important information in one table (title, abstract, publication date, pmid)
+Complete adds to this authors, topics_major, topics_minor, journal information, and times cited.
+Complete_normalized is a normalized version of "complete", where the information is distributed across tables.
+
+Basic: https://s3-us-west-2.amazonaws.com/statnews-medline/medline_basic.db.gz
+Complete: https://s3-us-west-2.amazonaws.com/statnews-medline/medline_complete.db.gz
+Complete Normalized: https://s3-us-west-2.amazonaws.com/statnews-medline/medline_complete_normalized.db.gz
+
+
+
+
+Dates:
+- All dates come in a "_str" and "_unix" version. "_str" contains the date as a yyyy-mm-dd string. "_unix" is a unix
+    timestamp in int. See https://en.wikipedia.org/wiki/Unix_time
+- date_pub_first is the date of the first publication. Articles are often published both electronically and in print at
+    different times. date_pub_first contains the earlier of the two.
+
+PMID:
+- pmid is a unique ID assigned by medline to every journal article
+
+Citations:
+- Citation data: only 2.138.171 articles out of 23.343.051 articles have citation data. It may be somehow stored in
+    other databases. See <CitationSubset> heading of xml files.
+
+Topics
+- Topic data is almost complete (21.850.751 articles have topics)
+- the table 'topics' of the 'complete_normalized' db lists all topics with mesh_id, tree_id, name, and creation date.
+    Note: one mesh_id can have multiple tree_ids, hence it can appear multiple times in this table.
+
+
+###########
+#  Basic  #
+###########
+
+CREATE TABLE refs(
+            pmid                integer  NOT NULL UNIQUE,
+            title               text  NOT NULL,
+            abstract            text,
+            date_pub_first_str  text,                   // date of first publication
+            date_pub_first_unix integer,                // see notes on unix timestamp
+
+            PRIMARY KEY (pmid)
+            );
+
+############
+# Complete #
+############
+
+CREATE TABLE IF NOT EXISTS refs(
+            pmid                integer  NOT NULL UNIQUE,
+            title               text  NOT NULL,
+            abstract            text,
+            authors             text,                   // author information listed as string, separated by semicolons. example:
+            topics_major        text,                   // major topics listed as string, separated by semicolons. example: "Cadmium; Carbonic Annhydrases; Mercury; Zinc
+            topics_minor        text,                   // minor topics listed as string, separated by semicolons.
+
+            pub_medium          text,                   // Type of publication, includes "Print", "Electronic", "Electronic-eCollection", "Electronic-Print", and "Print-Electronic"
+            journal_name        text,                   // Name of the publication
+            journal_volume      text,
+            journal_issue       text,
+            language            text,                   // publication language in 3 letters, e.g. "eng"
+
+            date_pub_first_str      text,
+            date_pub_first_unix     integer,
+
+            times_cited         integer,                // number of times the article has been cited. Still TBD.
+
+            PRIMARY KEY (pmid)
+            );
+
+#######################
+# Complete_normalized #
+#######################
+
+//pmid is the same in all tables -> use it to connect them.
+
+CREATE TABLE IF NOT EXISTS refs(
+            pmid                integer  NOT NULL UNIQUE,
+            title               text  NOT NULL,
+            abstract            text,
+            topics_major        text,                   // major topics listed as string, separated by semicolons. example: "Cadmium; Carbonic Annhydrases; Mercury; Zinc
+            topics_minor        text,                   // minor topics listed as string, separated by semicolons.
+
+            pub_medium          text,                   // Type of publication, includes "Print", "Electronic", "Electronic-eCollection", "Electronic-Print", and "Print-Electronic"
+            journal_name        text,                   // Name of the publication
+            journal_volume      text,
+            journal_issue       text,
+            language            text,
+
+            date_pub_first_str        text,
+            date_pub_first_unix       integer,
+
+            times_cited         integer,                // number of times the article has been cited. Still TBD.
+
+            PRIMARY KEY (pmid)
+            );''')
+
+cur.execute('''CREATE TABLE IF NOT EXISTS ref_authors(
+            id            INTEGER PRIMARY KEY,
+            pmid          INTEGER NOT NULL,
+            last_name     TEXT,
+            fore_name     TEXT,
+            affiliation   TEXT                          //affiliation as reported by author, non-standardized.
+            );''')
+
+cur.execute('''CREATE TABLE IF NOT EXISTS ref_topics(
+            id            INTEGER PRIMARY KEY,
+            pmid          INTEGER NOT NULL,
+            mesh_id       TEXT NOT NULL,                //unique id of the mesh topic. to find tree position, see table mesh
+            major_topic   INTEGER NOT NULL              // "1" if major topic in the article; "0" if minor topic
+            );''')
+
+cur.execute('''CREATE TABLE IF NOT EXISTS ref_citations(
+            id            INTEGER PRIMARY KEY,
+            citing_pmid   INTEGER NOT NULL,             // pmid of the citing article
+            cited_pmid    INTEGER NOT NULL              // pmid of the cited article
+            );''')
+
+cur.execute('''CREATE TABLE IF NOT EXISTS topics(
+            id            INTEGER PRIMARY KEY,
+            mesh_id       TEXT NOT NULL,                // id of the mesh (not unique)
+            tree_id       TEXT NOT NULL,                // position in topic tree
+            name          TEXT NOT NULL,                // name of the topic
+            date_created_str  TEXT,                     // date of topic creation
+            date_created_unix INTEGER
+            );''')

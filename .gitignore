@@ -1,0 +1,23 @@
+# Compiled python
+*.pyc
+*.so
+*.c
+build/
+dist/
+medline.egg-info/
+
+# Logs and data files
+*.log
+*.json
+*.pickle
+*.db
+*.mat
+*.lprof
+*~
+.idea/
+
+# Test folder
+medline/test/
+
+
+
